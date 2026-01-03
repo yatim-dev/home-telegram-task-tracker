@@ -80,3 +80,35 @@ class AsyncDB:
 
     def shutdown(self):
         self._executor.shutdown(wait=False, cancel_futures=True)
+
+    # -------- shop --------
+
+    async def list_rewards(self, active_only: bool = True):
+        return await self._run(self._db.list_rewards, active_only)
+
+    async def buy_reward(self, user_id: int, reward_id: int):
+        return await self._run(self._db.buy_reward, user_id, reward_id)
+
+    async def get_inventory(self, user_id: int):
+        return await self._run(self._db.get_inventory, user_id)
+
+    async def use_purchase(self, user_id: int, purchase_id: int):
+        return await self._run(self._db.use_purchase, user_id, purchase_id)
+
+    async def list_admin_ids(self):
+        return await self._run(self._db.list_admin_ids)
+
+    async def use_purchase_with_info(self, user_id: int, purchase_id: int):
+        return await self._run(self._db.use_purchase_with_info, user_id, purchase_id)
+
+    async def add_reward(self, title: str, description: str, price: int) -> int:
+        return await self._run(self._db.add_reward, title, description, price)
+
+    async def set_reward_description(self, reward_id: int, description: str) -> int:
+        return await self._run(self._db.set_reward_description, reward_id, description)
+
+    async def set_reward_active(self, reward_id: int, is_active: int) -> int:
+        return await self._run(self._db.set_reward_active, reward_id, is_active)
+
+    async def list_rewards_admin(self):
+        return await self._run(self._db.list_rewards_admin)

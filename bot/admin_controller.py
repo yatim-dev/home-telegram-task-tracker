@@ -251,3 +251,97 @@ class AdminController:
             f"🔁 {format_repeat(cmd.repeat_unit, cmd.repeat_every)}\n"
             f"💰 +{cmd.coins}"
         )
+
+    async def rewards(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self.auth.require_admin(update):
+            return
+
+        rows = await self.db.list_rewards_admin()
+        if not rows:
+            await update.message.reply_text("Наград нет.")
+            return
+
+        lines = ["🛒 Награды (все):\n"]
+        for rid, title, desc, price, is_active in rows:
+            status = "✅" if int(is_active) == 1 else "⛔"
+            lines.append(f"{status} {rid}. {title} — {price} 💰" + (f" — {desc}" if desc else ""))
+
+        await update.message.reply_text("\n".join(lines))
+
+    async def addreward(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self.auth.require_admin(update):
+            return
+
+        # /addreward 10 30 минут игр
+        text = update.message.text or ""
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            await update.message.reply_text("Формат: /addreward <price> <title>\nПример: /addreward 10 30 минут игр")
+            return
+
+        try:
+            price = int(parts[1])
+            if price < 0:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text("price должен быть целым числом >= 0")
+            return
+
+        title = parts[2].strip()
+        reward_id = await self.db.add_reward(title=title, description="", price=price)
+        await update.message.reply_text(f"✅ Награда добавлена: {reward_id}. {title} — {price} 💰")
+
+    async def rewarddesc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self.auth.require_admin(update):
+            return
+
+        text = update.message.text or ""
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            await update.message.reply_text(
+                "Формат: /rewarddesc <id> <description>\nПример: /rewarddesc 2 Выбор фильма вечером")
+            return
+
+        try:
+            rid = int(parts[1])
+        except ValueError:
+            await update.message.reply_text("id должен быть числом")
+            return
+
+        desc = parts[2].strip()
+        updated = await self.db.set_reward_description(rid, desc)
+        if not updated:
+            await update.message.reply_text("Награда не найдена.")
+            return
+        await update.message.reply_text("✅ Описание обновлено.")
+
+    async def rewardon(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self.auth.require_admin(update):
+            return
+        if not context.args:
+            await update.message.reply_text("Формат: /rewardon <id>")
+            return
+        try:
+            rid = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("id должен быть числом")
+            return
+
+        updated = await self.db.set_reward_active(rid, 1)
+        await update.message.reply_text("✅ Включено." if updated else "Награда не найдена.")
+
+    async def rewardoff(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self.auth.require_admin(update):
+            return
+        if not context.args:
+            await update.message.reply_text("Формат: /rewardoff <id>")
+            return
+        try:
+            rid = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("id должен быть числом")
+            return
+
+        updated = await self.db.set_reward_active(rid, 0)
+        await update.message.reply_text("⛔ Выключено." if updated else "Награда не найдена.")
+

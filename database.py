@@ -111,6 +111,31 @@ class Database:
         ''')
         self.conn.commit()
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rewards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT,
+                price INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS purchases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                reward_id INTEGER NOT NULL,
+                price INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new', -- new|used
+                created_at TEXT NOT NULL,
+                used_at TEXT,
+                FOREIGN KEY(reward_id) REFERENCES rewards(id)
+            )
+        ''')
+        self.conn.commit()
+
         # --- индексы ---
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user_completed_due ON tasks(user_id, completed, next_due);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_due_completed ON tasks(completed, next_due);")
@@ -120,6 +145,9 @@ class Database:
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_compl_user_time ON task_completions(user_id, completed_at);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_compl_task_time ON task_completions(task_id, completed_at);")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_rewards_active ON rewards(is_active, price);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_purchases_user_status ON purchases(user_id, status, created_at);")
         self.conn.commit()
 
         # --- мягкая миграция старых задач (если next_due пустой) ---
@@ -422,5 +450,176 @@ class Database:
         result = cursor.fetchone()
         return result[0] if result else 0
 
+    # ----------------------------
+    # Shop
+    # ----------------------------
+
+    def list_rewards(self, active_only: bool = True):
+        cursor = self.conn.cursor()
+        if active_only:
+            cursor.execute('''
+                SELECT id, title, description, price
+                FROM rewards
+                WHERE is_active = 1
+                ORDER BY price, id
+            ''')
+        else:
+            cursor.execute('''
+                SELECT id, title, description, price, is_active
+                FROM rewards
+                ORDER BY is_active DESC, price, id
+            ''')
+        return cursor.fetchall()
+
+    def get_reward(self, reward_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT id, title, description, price, is_active
+            FROM rewards
+            WHERE id = ?
+        ''', (reward_id,))
+        return cursor.fetchone()
+
+    def buy_reward(self, user_id: int, reward_id: int):
+        """
+        Атомарная покупка:
+        - проверяем, что награда активна
+        - проверяем баланс
+        - списываем монеты
+        - создаём purchase (status=new)
+        Возвращает: (ok, purchase_id, error_code, new_balance)
+          error_code: 'not_found' | 'inactive' | 'not_enough'
+        """
+        cursor = self.conn.cursor()
+
+        # BEGIN IMMEDIATE = забираем write-lock, чтобы баланс не “гонялся”
+        cursor.execute("BEGIN IMMEDIATE;")
+
+        cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        balance = row[0] if row else 0
+
+        cursor.execute("SELECT id, price, is_active, title FROM rewards WHERE id = ?", (reward_id,))
+        r = cursor.fetchone()
+        if not r:
+            self.conn.rollback()
+            return (False, None, "not_found", balance)
+
+        _, price, is_active, _title = r
+        if int(is_active) != 1:
+            self.conn.rollback()
+            return (False, None, "inactive", balance)
+
+        if balance < int(price):
+            self.conn.rollback()
+            return (False, None, "not_enough", balance)
+
+        # списание
+        cursor.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (int(price), user_id))
+
+        # покупка
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+            INSERT INTO purchases (user_id, reward_id, price, status, created_at)
+            VALUES (?, ?, ?, 'new', ?)
+        ''', (user_id, reward_id, int(price), now))
+        purchase_id = cursor.lastrowid
+
+        cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        new_balance = cursor.fetchone()[0]
+
+        self.conn.commit()
+        return (True, purchase_id, None, new_balance)
+
+    def get_inventory(self, user_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT p.id, r.title, r.description, p.price, p.created_at
+            FROM purchases p
+            JOIN rewards r ON r.id = p.reward_id
+            WHERE p.user_id = ? AND p.status = 'new'
+            ORDER BY p.created_at DESC, p.id DESC
+        ''', (user_id,))
+        return cursor.fetchall()
+
+    def use_purchase_with_info(self, user_id: int, purchase_id: int):
+        """
+        Помечает купон использованным и возвращает инфо о награде.
+        Возвращает:
+          (ok: bool, title: str|None, price: int|None)
+        """
+        cursor = self.conn.cursor()
+
+        # получим информацию о купоне (только если он new и принадлежит user_id)
+        cursor.execute("""
+            SELECT p.id, p.price, r.title
+            FROM purchases p
+            JOIN rewards r ON r.id = p.reward_id
+            WHERE p.id = ? AND p.user_id = ? AND p.status = 'new'
+        """, (purchase_id, user_id))
+        row = cursor.fetchone()
+        if not row:
+            return False, None, None
+
+        _pid, price, title = row
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute("""
+            UPDATE purchases
+            SET status = 'used', used_at = ?
+            WHERE id = ? AND user_id = ? AND status = 'new'
+        """, (now, purchase_id, user_id))
+
+        self.conn.commit()
+        if cursor.rowcount <= 0:
+            return False, None, None
+
+        return True, title, int(price)
+
+    def list_admin_ids(self):
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT user_id
+            FROM users
+            WHERE role = 'admin' AND is_active = 1
+            ORDER BY user_id
+        """)
+        return [row[0] for row in cursor.fetchall()]
+
+    def add_reward(self, title: str, description: str, price: int) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO rewards (title, description, price, is_active)
+            VALUES (?, ?, ?, 1)
+        """, (title, description, int(price)))
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def set_reward_description(self, reward_id: int, description: str) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE rewards SET description = ?
+            WHERE id = ?
+        """, (description, reward_id))
+        self.conn.commit()
+        return cursor.rowcount
+
+    def set_reward_active(self, reward_id: int, is_active: int) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE rewards SET is_active = ?
+            WHERE id = ?
+        """, (int(is_active), reward_id))
+        self.conn.commit()
+        return cursor.rowcount
+
+    def list_rewards_admin(self):
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id, title, description, price, is_active
+            FROM rewards
+            ORDER BY is_active DESC, price, id
+        """)
+        return cursor.fetchall()
 
 db = Database()

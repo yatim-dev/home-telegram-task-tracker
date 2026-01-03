@@ -10,6 +10,7 @@ from bot.help_controller import HelpController
 from bot.task_controller import TaskController
 from bot.reminder_service import ReminderService
 from bot.admin_controller import AdminController
+from bot.shop_controller import ShopController
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class TaskTrackerBot:
         self.tasks = TaskController(self.db)
         self.reminders = ReminderService(self.db)
         self.admin = AdminController(self.db)
+        self.shop = ShopController(self.db)
 
     def build(self) -> Application:
         application = Application.builder().token(self.token).build()
@@ -56,6 +58,18 @@ class TaskTrackerBot:
         application.add_handler(CommandHandler("addto", self.admin.addto))
         application.add_handler(CommandHandler("delete", self.admin.delete))
         application.add_handler(CommandHandler("edit", self.admin.edit))
+
+        # Shop
+        application.add_handler(CommandHandler("shop", self.shop.shop))
+        application.add_handler(CommandHandler("buy", self.shop.buy))
+        application.add_handler(CommandHandler("inventory", self.shop.inventory))
+        application.add_handler(CommandHandler("use", self.shop.use))
+
+        application.add_handler(CommandHandler("rewards", self.admin.rewards))
+        application.add_handler(CommandHandler("addreward", self.admin.addreward))
+        application.add_handler(CommandHandler("rewarddesc", self.admin.rewarddesc))
+        application.add_handler(CommandHandler("rewardon", self.admin.rewardon))
+        application.add_handler(CommandHandler("rewardoff", self.admin.rewardoff))
 
         # Reminders job
         if application.job_queue:
