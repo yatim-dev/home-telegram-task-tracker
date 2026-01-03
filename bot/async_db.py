@@ -1,114 +1,74 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from typing import Any, Iterable, Sequence
 
 
 class AsyncDB:
     """
-    Запускает ВСЕ sqlite-операции в одном выделенном потоке.
-    Это убирает блокировки event loop и ускоряет ответы бота.
+    Универсальный async-слой над sqlite3:
+    - все операции идут в одном выделенном потоке
+    - репозитории выполняют SQL через fetchone/fetchall/execute/executemany/transaction
     """
     def __init__(self, sync_db):
-        self._db = sync_db
+        self._db = sync_db  # SQLiteDatabase (имеет .conn и .close())
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sqlite-db")
 
     async def _run(self, fn, *args, **kwargs):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, partial(fn, *args, **kwargs))
 
-    # -------- users / auth --------
+    async def fetchone(self, sql: str, params: Sequence[Any] = ()):
+        def _fn():
+            cur = self._db.conn.cursor()
+            cur.execute(sql, params)
+            return cur.fetchone()
+        return await self._run(_fn)
 
-    async def add_user(self, user_id, username):
-        return await self._run(self._db.add_user, user_id, username)
+    async def fetchall(self, sql: str, params: Sequence[Any] = ()):
+        def _fn():
+            cur = self._db.conn.cursor()
+            cur.execute(sql, params)
+            return cur.fetchall()
+        return await self._run(_fn)
 
-    async def get_user(self, user_id):
-        return await self._run(self._db.get_user, user_id)
+    async def execute(self, sql: str, params: Sequence[Any] = (), *, commit: bool = True) -> int:
+        def _fn():
+            cur = self._db.conn.cursor()
+            cur.execute(sql, params)
+            if commit:
+                self._db.conn.commit()
+            return cur.rowcount
+        return await self._run(_fn)
 
-    async def activate_user(self, user_id, role: str):
-        return await self._run(self._db.activate_user, user_id, role)
+    async def executemany(self, sql: str, seq_of_params: Iterable[Sequence[Any]], *, commit: bool = True) -> int:
+        def _fn():
+            cur = self._db.conn.cursor()
+            cur.executemany(sql, list(seq_of_params))
+            if commit:
+                self._db.conn.commit()
+            return cur.rowcount
+        return await self._run(_fn)
 
-    async def find_user_id_by_username(self, username: str):
-        return await self._run(self._db.find_user_id_by_username, username)
+    async def transaction(self, fn, *, immediate: bool = True):
+        """
+        fn(cur) выполняется внутри транзакции.
+        immediate=True => BEGIN IMMEDIATE (для покупок/баланса/конкурентных списаний).
+        """
+        def _tx():
+            cur = self._db.conn.cursor()
+            cur.execute("BEGIN IMMEDIATE;" if immediate else "BEGIN;")
+            try:
+                result = fn(cur)
+                self._db.conn.commit()
+                return result
+            except Exception:
+                self._db.conn.rollback()
+                raise
+        return await self._run(_tx)
 
-    async def list_users(self):
-        return await self._run(self._db.list_users)
-
-    # -------- registration keys --------
-
-    async def create_registration_key(self, role: str, expires_at: str) -> str:
-        return await self._run(self._db.create_registration_key, role, expires_at)
-
-    async def consume_registration_key(self, key: str):
-        return await self._run(self._db.consume_registration_key, key)
-
-    # -------- tasks --------
-
-    async def add_task(self, **kwargs):
-        return await self._run(self._db.add_task, **kwargs)
-
-    async def get_tasks(self, user_id):
-        return await self._run(self._db.get_tasks, user_id)
-
-    async def complete_task(self, user_id, task_id):
-        return await self._run(self._db.complete_task, user_id, task_id)
-
-    async def get_task(self, task_id: int):
-        return await self._run(self._db.get_task, task_id)
-
-    async def get_tasks_until(self, user_id: int, until_due: str):
-        return await self._run(self._db.get_tasks_until, user_id, until_due)
-
-    async def update_task(self, task_id: int, task: str, next_due: str, coins: int, repeat_unit: str, repeat_every: int):
-        return await self._run(self._db.update_task, task_id, task, next_due, coins, repeat_unit, repeat_every)
-
-    async def delete_task(self, task_id: int):
-        return await self._run(self._db.delete_task, task_id)
-
-    async def get_history(self, user_id: int, limit: int = 20):
-        return await self._run(self._db.get_history, user_id, limit)
-
-    async def get_balance(self, user_id):
-        return await self._run(self._db.get_balance, user_id)
-
-    # -------- reminders --------
-
-    async def get_tasks_to_remind(self, **kwargs):
-        return await self._run(self._db.get_tasks_to_remind, **kwargs)
-
-    async def mark_tasks_notified(self, task_ids, due_str):
-        return await self._run(self._db.mark_tasks_notified, task_ids, due_str)
-
-    def shutdown(self):
-        self._executor.shutdown(wait=False, cancel_futures=True)
-
-    # -------- shop --------
-
-    async def list_rewards(self, active_only: bool = True):
-        return await self._run(self._db.list_rewards, active_only)
-
-    async def buy_reward(self, user_id: int, reward_id: int):
-        return await self._run(self._db.buy_reward, user_id, reward_id)
-
-    async def get_inventory(self, user_id: int):
-        return await self._run(self._db.get_inventory, user_id)
-
-    async def use_purchase(self, user_id: int, purchase_id: int):
-        return await self._run(self._db.use_purchase, user_id, purchase_id)
-
-    async def list_admin_ids(self):
-        return await self._run(self._db.list_admin_ids)
-
-    async def use_purchase_with_info(self, user_id: int, purchase_id: int):
-        return await self._run(self._db.use_purchase_with_info, user_id, purchase_id)
-
-    async def add_reward(self, title: str, description: str, price: int) -> int:
-        return await self._run(self._db.add_reward, title, description, price)
-
-    async def set_reward_description(self, reward_id: int, description: str) -> int:
-        return await self._run(self._db.set_reward_description, reward_id, description)
-
-    async def set_reward_active(self, reward_id: int, is_active: int) -> int:
-        return await self._run(self._db.set_reward_active, reward_id, is_active)
-
-    async def list_rewards_admin(self):
-        return await self._run(self._db.list_rewards_admin)
+    async def aclose(self):
+        try:
+            await self._run(self._db.close)
+        finally:
+            self._executor.shutdown(wait=False, cancel_futures=True)

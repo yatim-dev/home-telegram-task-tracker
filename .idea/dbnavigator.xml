@@ -11,9 +11,6 @@
   </component>
   <component name="DBNavigator.Project.DatabaseAssistantManager">
     <assistants>
-      <assistant-state connection-id="c8062e20-29e2-4959-aeb3-aa83c43726db" assistant-type="SELECT_AI" default-profile-name="" selected-chat-id="" availability="UNAVAILABLE" acknowledgement="NONE">
-        <tools />
-      </assistant-state>
       <assistant-state connection-id="c8062e20-29e2-4959-aeb3-aa83c43726db" assistant-type="PUBLIC" default-profile-name="" selected-chat-id="A6A1EF076A6B4CD897401ED3BA767A23" availability="AVAILABLE" acknowledgement="ENGAGED" selected="true">
         <chats>
           <chat id="A6A1EF076A6B4CD897401ED3BA767A23" title="" session-signature="" timestamp="1767334096760">
@@ -21,6 +18,9 @@
             <context provider="" profile="" model="" action="" interactive="true" />
           </chat>
         </chats>
+        <tools />
+      </assistant-state>
+      <assistant-state connection-id="c8062e20-29e2-4959-aeb3-aa83c43726db" assistant-type="SELECT_AI" default-profile-name="" selected-chat-id="" availability="UNAVAILABLE" acknowledgement="NONE">
         <tools />
       </assistant-state>
     </assistants>
@@ -50,6 +50,9 @@
   </component>
   <component name="DBNavigator.Project.DatabaseSessionManager">
     <connection id="c8062e20-29e2-4959-aeb3-aa83c43726db" />
+  </component>
+  <component name="DBNavigator.Project.ExecutionManager">
+    <retain-sticky-names value="false" />
   </component>
   <component name="DBNavigator.Project.ObjectQuickFilterManager">
     <last-used-operator value="EQUAL" />
