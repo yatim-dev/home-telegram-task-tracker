@@ -68,16 +68,17 @@ class HelpController:
                 return (
                     "<b>📌 Команды (админ)</b>\n\n"
                     "<b>Пользовательские:</b>\n"
-                    "<b>/tasks</b> — список ваших задач\n"
+                    "<b>/add</b> — добавить задачу себе\n"
+                    "Форматы:\n"
+                    "• <code>/add &lt;текст&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [daily|weekly|every:Nd]</code>\n"
+                    "• <code>/add &lt;текст&gt; &lt;YYYY-MM-DD&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [once|daily|weekly|every:Nd]</code>\n\n"
+                    "<b>/tasks</b> — список ваших задач на сегодня\n"
+                    "<b>/tasks all</b> — все ваши задачи\n"
                     "<b>/done</b> — выполнить: <code>/done &lt;номер&gt;</code>\n"
                     "<b>/balance</b> — баланс\n"
                     "<b>/history</b> — история выполнений: <code>/history [N]</code>\n"
                     "<b>/whoami</b> — профиль\n\n"
                     "<b>Админские:</b>\n"
-                    "<b>/add</b> — добавить задачу себе\n"
-                    "Форматы:\n"
-                    "• <code>/add &lt;текст&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [daily|weekly|every:Nd]</code>\n"
-                    "• <code>/add &lt;текст&gt; &lt;YYYY-MM-DD&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [once|daily|weekly|every:Nd]</code>\n\n"
                     "<b>/addto</b> — назначить задачу пользователю:\n"
                     "• <code>/addto @username &lt;... как в /add ...&gt;</code>\n\n"
                     "<b>/edit</b> — редактировать задачу:\n"
@@ -94,14 +95,18 @@ class HelpController:
             # обычный пользователь
             return (
                 "<b>📌 Команды</b>\n\n"
+                "<b>/add</b> — добавить задачу себе\n"
+                "Форматы:\n"
+                "• <code>/add &lt;текст&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [daily|weekly|every:Nd]</code>\n"
+                "• <code>/add &lt;текст&gt; &lt;YYYY-MM-DD&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [once|daily|weekly|every:Nd]</code>\n\n"
                 "<b>/tasks</b> — список ваших задач на сегодня\n"
-                "<b>/tasks all</b> — все задачи\n"
+                "<b>/tasks all</b> — все ваши задачи\n"
                 "<b>/done</b> — отметить выполнение: <code>/done &lt;номер&gt;</code>\n"
                 "<b>/balance</b> — баланс\n"
                 "<b>/history</b> — история выполнений: <code>/history [N]</code>\n"
                 "<b>/whoami</b> — профиль\n\n"
                 "<b>/help</b> — справка\n\n"
-                "Задачи назначает администратор. Вы можете только выполнять."
+                "Примечание: назначать задачи другим пользователям может только администратор (команда /addto)."
             )
 
         if section == HELP_EXAMPLES:

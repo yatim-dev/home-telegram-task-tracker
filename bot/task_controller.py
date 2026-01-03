@@ -87,8 +87,8 @@ class TaskController:
         )
 
     async def add_task(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Только админ
-        if not await self.auth.require_admin(update):
+        # Любой активный пользователь может добавлять задачи СЕБЕ
+        if not await self.auth.require_active(update):
             return
 
         user = update.effective_user
@@ -105,9 +105,7 @@ class TaskController:
                 "/add Помыть посуду 18:30 10\n"
                 "/add Сдать проект 2026-01-10 12:00 50 once\n"
                 "/add Полить цветы 2026-01-03 09:00 2 daily\n"
-                "/add Протереть пыль 2026-01-03 18:00 5 every:3d\n\n"
-                "Назначить пользователю:\n"
-                "/addto @username <...>"
+                "/add Протереть пыль 2026-01-03 18:00 5 every:3d"
             )
             return
 
@@ -118,13 +116,13 @@ class TaskController:
         next_due = cmd.start_dt.strftime("%Y-%m-%d %H:%M")
 
         task_id = await self.db.add_task(
-            user_id=user.id,  # назначено админу (самому себе)
+            user_id=user.id,  # назначаем самому себе
             task=cmd.task_text,
             next_due=next_due,
             coins=cmd.coins,
             repeat_unit=cmd.repeat_unit,
             repeat_every=cmd.repeat_every,
-            assigned_by=user.id,  # кто назначил (для аудита)
+            assigned_by=user.id,  # создатель/назначивший — сам пользователь (можно None, если не хотите)
         )
 
         await update.message.reply_text(
@@ -132,8 +130,7 @@ class TaskController:
             f"📝 {cmd.task_text}\n"
             f"⏰ Следующее напоминание: {next_due}\n"
             f"🔁 Повтор: {format_repeat(cmd.repeat_unit, cmd.repeat_every)}\n"
-            f"💰 +{cmd.coins} монет при выполнении\n\n"
-            f"Чтобы назначить задачу пользователю: /addto @username <...>"
+            f"💰 +{cmd.coins} монет при выполнении"
         )
 
     async def show_tasks(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
