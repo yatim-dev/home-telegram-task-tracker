@@ -16,7 +16,8 @@ class TaskTrackerBot:
         if not self.token:
             raise RuntimeError("Не найден TELEGRAM_TASK_TRACKER_TOKEN в переменных окружения.")
 
-        self.container = Container("tasks.db")
+        db_path = os.environ.get("DB_PATH", "tasks.db")
+        self.container = Container(db_path)
 
     def build(self) -> Application:
         application = Application.builder().token(self.token).build()
