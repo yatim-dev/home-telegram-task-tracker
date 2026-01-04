@@ -56,10 +56,11 @@ class HelpController:
         if section == HELP_COMMANDS:
             common = (
                 "<b>/add</b> — добавить задачу себе\n"
-                "Форматы:\n"
-                "• <code>/add &lt;текст&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; [daily|weekly|every:Nd]</code>\n"
+                "<b>Форматы:</b>\n"
+                "• <code>/add &lt;текст&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; "
+                "[daily|weekly|monthly|every:Nd|every:Nw|every:Nm]</code>\n"
                 "• <code>/add &lt;текст&gt; &lt;YYYY-MM-DD&gt; &lt;ЧЧ:ММ&gt; &lt;монетки&gt; "
-                "[once|daily|weekly|every:Nd]</code>\n\n"
+                "[once|daily|weekly|monthly|every:Nd|every:Nw|every:Nm]</code>\n\n"
                 "<b>/tasks</b> — задачи на сегодня\n"
                 "<b>/tasks all</b> — все ваши задачи\n"
                 "<b>/done</b> — выполнить: <code>/done &lt;task_id&gt;</code>\n"
@@ -87,7 +88,7 @@ class HelpController:
                 "<b>/edit</b> — редактировать: <code>/edit &lt;task_id&gt; ...</code>\n"
                 "<b>/delete</b> — удалить: <code>/delete &lt;task_id&gt;</code>\n\n"
                 "<b>Админские (пользователи):</b>\n"
-                "<b>/genkey</b> — ключ: <code>/genkey user 2026-01-10_12:00</code>\n"
+                "<b>/genkey</b> — создать ключ: <code>/genkey user 2026-01-10_12:00</code>\n"
                 "<b>/users</b> — список пользователей\n\n"
                 "<b>Админские (магазин):</b>\n"
                 "<b>/rewards</b> — список наград\n"
@@ -98,47 +99,76 @@ class HelpController:
             )
 
         if section == HELP_EXAMPLES:
-            if is_admin:
-                return (
-                    "<b>🧪 Примеры (админ)</b>\n\n"
-                    "<code>/add Помыть посуду 18:30 10</code>\n"
-                    "<code>/addto @vasya Помыть посуду 18:30 10</code>\n"
-                    "<code>/edit 12 Помыть посуду 19:00 10</code>\n"
-                    "<code>/delete 12</code>\n\n"
-                    "<code>/shop</code>\n"
-                    "<code>/buy 1</code>\n"
-                    "<code>/inventory</code>\n"
-                    "<code>/use 15</code>\n\n"
-                    "<code>/rewards</code>\n"
-                    "<code>/addreward 10 30 минут игр</code>\n"
-                    "<code>/rewarddesc 1 Дополнительные 30 минут</code>\n"
-                    "<code>/rewardoff 1</code>\n"
-                )
-            return (
-                "<b>🧪 Примеры</b>\n\n"
-                "<code>/add Полить цветы 09:00 2</code>\n"
-                "<code>/tasks</code>\n"
-                "<code>/done 3</code>\n"
+            add_examples = (
+                "<b>➕ /add — примеры</b>\n"
+                "<code>/add Помыть посуду 18:30 10</code>\n"
+                "<code>/add Полить цветы 09:00 2 daily</code>\n"
+                "<code>/add Протереть пыль 18:00 5 every:3d</code>\n"
+                "<code>/add Тренировка 19:00 7 weekly</code>\n"
+                "<code>/add Стирка 20:00 3 every:2w</code>\n"
+                "<code>/add Оплатить интернет 10:00 5 monthly</code>\n"
+                "<code>/add Заменить фильтр 10:00 20 every:3m</code>\n"
+                "<code>/add День рождения мамы 2026-05-12 09:00 50 once</code>\n"
+                "<code>/add Отправить отчёт 2026-02-01 12:00 30 once</code>\n"
+                "<code>/add Медосмотр 2026-02-01 10:00 15 monthly</code>\n"
+            )
+
+            shop_examples = (
+                "<b>🛒 Магазин</b>\n"
                 "<code>/shop</code>\n"
                 "<code>/buy 1</code>\n"
                 "<code>/inventory</code>\n"
                 "<code>/use 15</code>\n"
             )
 
+            user_examples = (
+                "<b>✅ Выполнение и список</b>\n"
+                "<code>/tasks</code>\n"
+                "<code>/tasks all</code>\n"
+                "<code>/done 3</code>\n"
+                "<code>/balance</code>\n"
+                "<code>/history 20</code>\n"
+            )
+
+            if is_admin:
+                admin_examples = (
+                    "<b>🛠 Админ</b>\n"
+                    "<code>/addto @vasya Помыть посуду 18:30 10</code>\n"
+                    "<code>/edit 12 Помыть посуду 19:00 10</code>\n"
+                    "<code>/delete 12</code>\n"
+                    "<code>/users</code>\n"
+                    "<code>/genkey user 2026-01-10_12:00</code>\n\n"
+                    "<b>🛍 Управление магазином</b>\n"
+                    "<code>/rewards</code>\n"
+                    "<code>/addreward 10 30 минут игр</code>\n"
+                    "<code>/rewarddesc 1 Дополнительные 30 минут</code>\n"
+                    "<code>/rewardoff 1</code>\n"
+                    "<code>/rewardon 1</code>\n"
+                )
+                return "<b>🧪 Примеры (админ)</b>\n\n" + add_examples + "\n" + user_examples + "\n" + shop_examples + "\n" + admin_examples
+
+            return "<b>🧪 Примеры</b>\n\n" + add_examples + "\n" + user_examples + "\n" + shop_examples
+
         if section == HELP_REMINDERS:
             return (
                 "<b>⏰ Напоминания</b>\n\n"
                 "Бот проверяет задачи примерно раз в минуту.\n"
                 "Разовые (once) напоминаются один раз.\n"
-                "Повторяющиеся — после <code>/done</code> переносятся на следующий срок.\n"
+                "Повторяющиеся — после <code>/done</code> переносятся на следующий срок.\n\n"
+                "<b>Поддерживаемые повторы:</b>\n"
+                "• daily / every:Nd\n"
+                "• weekly / every:Nw\n"
+                "• monthly / every:Nm\n"
             )
 
         if section == HELP_FAQ:
             return (
                 "<b>❓ FAQ</b>\n\n"
                 "<b>Почему задача не исчезает после /done?</b>\n"
-                "Повторяющиеся задачи переносятся на следующий срок.\n"
-                "Чтобы исчезла — создавайте <code>once</code>.\n\n"
+                "Повторяющиеся задачи (daily/weekly/monthly/every:...) переносятся на следующий срок.\n"
+                "Чтобы задача исчезла после выполнения — создавайте <code>once</code>.\n\n"
+                "<b>Почему /tasks пусто?</b>\n"
+                "Возможно, у вас нет задач на сегодня. Попробуйте <code>/tasks all</code>.\n\n"
                 "<b>Как тратить монетки?</b>\n"
                 "<code>/shop</code> → <code>/buy</code> → <code>/inventory</code> → <code>/use</code>\n"
             )
@@ -147,8 +177,9 @@ class HelpController:
             return (
                 "<b>ℹ️ О боте</b>\n\n"
                 "Трекер задач с наградами:\n"
-                "• задачи и напоминания\n"
-                "• монетки и магазин\n"
+                "• задачи, повторы и напоминания\n"
+                "• монетки за выполнение\n"
+                "• магазин наград (купоны)\n"
                 "• история выполнений\n"
             )
 
@@ -163,7 +194,6 @@ class HelpController:
                 "<code>/rewardon</code>, <code>/rewardoff</code>\n"
             )
 
-        # HELP_MENU
         return (
             "<b>📚 Справка</b>\n\n"
             "Выберите раздел кнопками ниже или напишите:\n"
