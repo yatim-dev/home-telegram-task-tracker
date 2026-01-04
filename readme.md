@@ -434,8 +434,10 @@ N можно от 1 до 100.
 once — разовая задача
 daily — каждый день
 weekly — каждую неделю
-every:Nd — каждые N дней (например every:3d)
-every:Nw — каждые N недель (например every:2w)
+monthly — каждый месяц
+every:Nd  (например every:3d)
+every:Nw  (например every:2w)
+every:Nm  (например every:3m)
 ```
 
 ## Напоминания
