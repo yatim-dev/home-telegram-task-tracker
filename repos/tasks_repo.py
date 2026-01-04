@@ -1,7 +1,25 @@
 from __future__ import annotations
 
+import calendar
 from datetime import datetime, timedelta
 from typing import Optional, List
+
+
+def add_months(dt: datetime, months: int) -> datetime:
+    """
+    Добавляет N месяцев к datetime.
+    Если исходный день (например 31) не существует в целевом месяце,
+    используется последний день целевого месяца.
+    """
+    y = dt.year
+    m = dt.month + int(months)
+
+    y += (m - 1) // 12
+    m = (m - 1) % 12 + 1
+
+    last_day = calendar.monthrange(y, m)[1]
+    d = min(dt.day, last_day)
+    return dt.replace(year=y, month=m, day=d)
 
 
 class TasksRepo:
@@ -117,7 +135,7 @@ class TasksRepo:
           - проверяет задачу
           - пишет запись в task_completions
           - начисляет баланс
-          - закрывает once или переносит повторяющуюся
+          - закрывает once или переносит повторяющуюся (day/week/month)
         """
         def _fn(cur):
             cur.execute(
@@ -161,6 +179,8 @@ class TasksRepo:
                 new_due = dt + timedelta(days=every)
             elif repeat_unit == "week":
                 new_due = dt + timedelta(weeks=every)
+            elif repeat_unit == "month":
+                new_due = add_months(dt, every)
             else:
                 # неизвестный repeat_unit -> закрываем
                 cur.execute("UPDATE tasks SET completed = 1 WHERE id = ?", (task_id,))
